@@ -29,11 +29,21 @@
 		v-for="(entry, index) in locationData"
 		:key="entry.lat + entry.lon"
 	>
-		<h3 class="location-card__location">
-			Location: {{ entry.cityName }},
-			{{ entry.stateName !== entry.cityName ? entry.stateName + "," : "" }}
-			{{ entry.countryName }}
-		</h3>
+		<div class="location-card__header-container">
+			<h3 class="location-card__header-container__location">
+				Location: {{ entry.cityName }},
+				{{ entry.stateName !== entry.cityName ? entry.stateName + "," : "" }}
+				{{ entry.countryName }}
+			</h3>
+			<button
+				class="location-card__header-container__remove-button"
+				v-if="index !== 0"
+				title="Remove Weather Card"
+				@click="removeEntry(index)"
+			>
+				&horbar;
+			</button>
+		</div>
 		<p v-if="index === 0" class="location-card__current-location">
 			current location
 		</p>
@@ -104,6 +114,9 @@ const getSearchResults = () => {
 	}, 300);
 };
 
+// location data array for weather card rendering
+const locationData = ref([]);
+
 const onSelect = async (searchResult) => {
 	const {
 		name: cityName,
@@ -133,46 +146,60 @@ const onSelect = async (searchResult) => {
 	locationData.value.push(dataCurrentWeather);
 };
 
-// find current latitude and longitude for local details
-let latitude;
-let longitude;
-const success = (position) => {
-	const lat = position.coords.latitude;
-	const lon = position.coords.longitude;
-
-	latitude = lat;
-	longitude = lon;
-	getCurrentWeatherMapLocationInformation();
+// Remove weather Entry (with remove-button onClick)
+const removeEntry = (index) => {
+	locationData.value.splice(index, 1);
 };
+
+// Retrieve current location weather from API
+async function getCurrentWeatherMapLocationInformation(latitude, longitude) {
+	try {
+		// Find lat/lon coordinates of current city/location
+		const API_URL_GEOLOCATION_REVERSE = `http://api.openweathermap.org/geo/1.0/reverse?lat=${latitude}&lon=${longitude}&appid=${API_KEY}`;
+		const apiResponse = await fetch(API_URL_GEOLOCATION_REVERSE);
+		const dataGeolocationReverse = await apiResponse.json();
+
+		// Make API call to get current weather data for current location
+		const API_URL_CURRENT_LOCATION_WEATHER = `https://api.openweathermap.org/data/3.0/onecall?lat=${latitude}&lon=${longitude}&exclude=minutely,hourly,daily,alerts&appid=${API_KEY}&units=metric`;
+		const apiResponseCurrentLocationWeather = await fetch(
+			API_URL_CURRENT_LOCATION_WEATHER
+		);
+		const dataCurrentLocationWeather = {
+			...(await apiResponseCurrentLocationWeather.json()),
+			cityName: dataGeolocationReverse[0].name,
+			stateName: dataGeolocationReverse[0].state,
+			countryName: dataGeolocationReverse[0].country,
+		};
+		// Push returned api values to locationData ref
+		locationData.value.push(dataCurrentLocationWeather);
+	} catch (error) {
+		console.log(error);
+	}
+}
+
+// Get current latitude and longitude for local details
+const getCurrentPosition = () => {
+	return new Promise((resolve, reject) => {
+		navigator.geolocation.getCurrentPosition(resolve, reject);
+	});
+};
+
+const success = (position) => {
+	const { latitude, longitude } = position.coords;
+	getCurrentWeatherMapLocationInformation(latitude, longitude);
+};
+
 const error = (err) => {
 	console.log(err);
 };
-navigator.geolocation.getCurrentPosition(success, error);
 
-// location data
-const locationData = ref([]);
-
-// Retrieve current location weather from API
-async function getCurrentWeatherMapLocationInformation() {
-	// Find lat/lon coordinates of current city/location
-	const API_URL_GEOLOCATION_REVERSE = `http://api.openweathermap.org/geo/1.0/reverse?lat=${latitude}&lon=${longitude}&appid=${API_KEY}`;
-	const apiResponse = await fetch(API_URL_GEOLOCATION_REVERSE);
-	const dataGeolocationReverse = await apiResponse.json();
-
-	// Make API call to get current weather data for current location
-	const API_URL_CURRENT_LOCATION_WEATHER = `https://api.openweathermap.org/data/3.0/onecall?lat=${latitude}&lon=${longitude}&exclude=minutely,hourly,daily,alerts&appid=${API_KEY}&units=metric`;
-	const apiResponseCurrentLocationWeather = await fetch(
-		API_URL_CURRENT_LOCATION_WEATHER
-	);
-	const dataCurrentLocationWeather = {
-		...(await apiResponseCurrentLocationWeather.json()),
-		cityName: dataGeolocationReverse[0].name,
-		stateName: dataGeolocationReverse[0].state,
-		countryName: dataGeolocationReverse[0].country,
-	};
-	// Push returned api values to locationData ref
-	locationData.value.push(dataCurrentLocationWeather);
-}
+getCurrentPosition()
+	.then((position) => {
+		success(position);
+	})
+	.catch((error) => {
+		error(error);
+	});
 </script>
 
 <style scoped>
@@ -240,6 +267,10 @@ header {
 	flex-direction: column;
 	width: 50%;
 	padding: 1rem;
+}
+
+.location-card__header-container {
+	display: flex;
 }
 
 .location-card__current-location {
