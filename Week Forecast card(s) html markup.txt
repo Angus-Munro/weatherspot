@@ -1,0 +1,23 @@
+<div class="week-forecast">
+			<!-- div to be multiplied by 8, array loop for/in -->
+			<div v-for="item in dayForecastSummary" class="week-forecast__card">
+				<div class="week-forecast__card-detail week-forecast__card-detail--day">
+					{{ item.day }}
+				</div>
+				<img
+					class="week-forecast__card-detail week-forecast__card-detail--preview-icon"
+					src="./assets/img/weather-icon-placeholder.png"
+					alt="Weather Preview Icon"
+				/>
+				<div
+					class="week-forecast__card-detail week-forecast__card-detail--temperatures"
+				>
+					<span class="week-forecast__card-detail--temperatures-high"
+						>{{ item.temperature.high }}&deg;
+					</span>
+					<span class="week-forecast__card-detail--temperatures-low"
+						>{{ item.temperature.low }}&deg;</span
+					>
+				</div>
+			</div>
+		</div>
