@@ -155,39 +155,14 @@
 			</p>
 		</div>
 	</div> -->
-
-	<div>
-		<div
-			v-for="(entry, index) in locationData"
-			style="display: flex; gap: 0.5rem"
-		>
-			<p>{{ index }} {{ entry.weatherData.cityName }}</p>
-			<button @click="removeEntry(entry.id)">Delete</button>
-		</div>
-	</div>
 </template>
 
 <script setup>
 // Imports
 import { ref, onMounted } from "vue";
 import stateCodeUSJsonData from "@/assets/us-states-json-array.json";
-import {
-	collection,
-	onSnapshot,
-	addDoc,
-	query,
-	orderBy,
-	doc,
-	deleteDoc,
-} from "firebase/firestore";
+import { collection, onSnapshot, addDoc } from "firebase/firestore";
 import { db } from "@/firebase";
-
-// firebase refs
-const weatherEntriesCollectionRef = collection(db, "WeatherEntries");
-const weatherEntriesCollectionQuery = query(
-	weatherEntriesCollectionRef,
-	orderBy("dateAdded", "asc")
-);
 
 // current location data value for top weather card rendering
 const currentLocationData = ref(null);
@@ -196,7 +171,7 @@ const locationData = ref([]);
 
 // Database connection testing
 onMounted(async () => {
-	await onSnapshot(weatherEntriesCollectionQuery, async (querySnapshot) => {
+	await onSnapshot(collection(db, "WeatherEntries"), async (querySnapshot) => {
 		let fbLocationEntries = [];
 		await Promise.all(
 			querySnapshot.docs.map(async (doc) => {
@@ -208,21 +183,16 @@ onMounted(async () => {
 					doc.data().state,
 					doc.data().country
 				);
-				const dateAdded = doc.data().dateAdded;
 
 				const location = {
 					id,
-					dateAdded,
 					weatherData,
 				};
 
 				fbLocationEntries.push(location);
-				console.log(fbLocationEntries);
 			})
 		);
-		locationData.value = fbLocationEntries.sort(
-			(a, b) => a.dateAdded - b.dateAdded
-		);
+		locationData.value = fbLocationEntries;
 		console.log(locationData.value);
 	});
 });
@@ -234,14 +204,14 @@ const API_KEY = "7028d73a4243e39fb498907181193a2c";
 const searchQuery = ref("");
 const queryTimeout = ref(null);
 const openWeatherMapSearchResults = ref(null);
-const geocodingLimit = 5;
+const limit = 5;
 
 const getSearchResults = () => {
 	clearTimeout(queryTimeout.value);
 	queryTimeout.value = setTimeout(async () => {
 		if (searchQuery.value !== "") {
 			const result = await fetch(
-				`http://api.openweathermap.org/geo/1.0/direct?q=${searchQuery.value}&geocodingimit=${geocodingLimit}&appid=${API_KEY}`
+				`http://api.openweathermap.org/geo/1.0/direct?q=${searchQuery.value}&limit=${limit}&appid=${API_KEY}`
 			);
 			const data = await result.json();
 			openWeatherMapSearchResults.value = data;
@@ -259,12 +229,13 @@ const retrieveWeatherData = async (
 	stateName,
 	countryName
 ) => {
-	const API_URL_CURRENT_WEATHER = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${API_KEY}&units=metric`;
+	console.log(latitude, longitude);
+	const API_URL_CURRENT_WEATHER = `https://api.openweathermap.org/data/3.0/onecall?lat=${latitude}&lon=${longitude}&exclude=minutely,hourly,daily,alerts&appid=${API_KEY}&units=metric`;
 	const apiResponseCurrentWeather = await fetch(API_URL_CURRENT_WEATHER);
 	const dataCurrentWeather = {
 		...(await apiResponseCurrentWeather.json()),
 		cityName,
-		stateName: stateName == undefined ? "" : stateName,
+		stateName: stateName === undefined ? "" : stateName,
 		countryName,
 	};
 
@@ -348,21 +319,32 @@ const onSelect = async (searchResult) => {
 	// locationData.value.push(weatherData);
 	// console.log(locationData.value);
 
-	addDoc(weatherEntriesCollectionRef, {
-		// remove '.coord' portion for below two element value when going back to onecall api
-		latitude: weatherData.coord.lat,
-		longitude: weatherData.coord.lon,
+	addDoc(collection(db, "WeatherEntries"), {
+		latitude: weatherData.lat,
+		longitude: weatherData.lon,
 		name: weatherData.cityName,
 		state: weatherData.stateName,
 		country: weatherData.countryName,
-		dateAdded: Date.now(),
 	});
-	console.log(locationData.value);
+
+
 };
 
+// // Test function
+// const latLonTestFunction = async () => {
+// 		const API_URL_CURRENT_WEATHER = `https://api.openweathermap.org/data/2.5/weather?lat=-89.1332&lon=19.4326&appid=${API_KEY}&units=metric`;
+// 		const apiResponseCurrentWeather = await fetch(API_URL_CURRENT_WEATHER);
+// 		console.log(apiResponseCurrentWeather);
+// 		const dataCurrentWeather = {
+// 			...(await apiResponseCurrentWeather.json()),
+// 		};
+// 		console.log(dataCurrentWeather);
+// 	};
+// 	latLonTestFunction();
+
 // Remove weather Entry (with remove-button onClick)
-const removeEntry = (id) => {
-	deleteDoc(doc(weatherEntriesCollectionRef, id));
+const removeEntry = (index) => {
+	locationData.value.splice(index, 1);
 };
 </script>
 
